@@ -1,0 +1,1 @@
+export { default } from "file:///Users/jessicamccormack/Documents/code/vibe-code/grandmas-recipes/node_modules/@nuxt/vite-builder/dist/runtime/client.manifest.mjs"

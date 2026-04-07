@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Lato", "Inter", system-ui, sans-serif;
+
+  --color-parchment: #EFF5FF;
+  --color-cream: #D9E8F8;
+  --color-ink: #00338D;
+  --color-brown: #002D7A;
+  --color-gold: #C60C30;
+  --color-rust: #C60C30;
+  --color-sage: #1B4FA8;
+  --color-muted: #5F7A9E;
+  --color-border: #B5CEEA;
+  --color-soft: #C8DEF2;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-parchment);
+  color: var(--color-ink);
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-rust text-parchment font-sans font-semibold px-5 py-2.5 rounded-lg hover:bg-brown transition-colors duration-200 cursor-pointer inline-flex items-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply bg-cream text-brown font-sans font-semibold px-5 py-2.5 rounded-lg border border-border hover:bg-soft transition-colors duration-200 cursor-pointer;
+  }
+
+  .tag-pill {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-sans font-semibold tracking-wide;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-lg border border-border bg-white font-sans text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold transition-all duration-150;
+  }
+
+  .section-heading {
+    @apply flex items-center gap-3 mb-4;
+  }
+
+  .section-heading h3 {
+    @apply font-serif text-lg text-ink whitespace-nowrap;
+  }
+
+  .section-heading::after {
+    content: '';
+    @apply flex-1 h-px bg-border;
+  }
+}
