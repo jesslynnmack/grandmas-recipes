@@ -157,45 +157,54 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 // Scan photo handlers
-const onFileChange = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  scanFile.value = file
-  scanPreviewUrl.value = URL.createObjectURL(file)
+const addFiles = (files: FileList | File[]) => {
+  for (const file of Array.from(files)) {
+    if (!file.type.startsWith('image/')) continue
+    if (scanFiles.value.length >= 2) break
+    scanFiles.value.push(file)
+    scanPreviewUrls.value.push(URL.createObjectURL(file))
+  }
   scanError.value = ''
+}
+
+const onFileChange = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files) addFiles(files)
+  // Reset input so same file can be re-selected
+  ;(e.target as HTMLInputElement).value = ''
 }
 
 const onDrop = (e: DragEvent) => {
   e.preventDefault()
-  const file = e.dataTransfer?.files?.[0]
-  if (!file || !file.type.startsWith('image/')) return
-  scanFile.value = file
-  scanPreviewUrl.value = URL.createObjectURL(file)
-  scanError.value = ''
+  if (e.dataTransfer?.files) addFiles(e.dataTransfer.files)
 }
 
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+
 const handleScan = async () => {
-  if (!scanFile.value) return
+  if (!scanFiles.value.length) return
   scanLoading.value = true
   scanError.value = ''
 
   try {
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve((reader.result as string).split(',')[1])
-      reader.onerror = reject
-      reader.readAsDataURL(scanFile.value!)
-    })
+    const images = await Promise.all(
+      scanFiles.value.map(async (file) => ({
+        imageBase64: await toBase64(file),
+        mediaType: file.type,
+      }))
+    )
 
     const result = await $fetch('/api/scan-recipe', {
       method: 'POST',
-      body: {
-        imageBase64: base64,
-        mediaType: scanFile.value.type,
-      },
+      body: { images },
     }) as any
 
-    // Populate form fields
     title.value = result.title || ''
     description.value = result.description || ''
     prepTime.value = result.prepTime || ''
@@ -206,7 +215,6 @@ const handleScan = async () => {
     notes.value = result.notes || ''
     errors.value = {}
 
-    // Switch to manual tab to review
     activeTab.value = 'manual'
   } catch (err: any) {
     scanError.value = err?.data?.statusMessage || 'Something went wrong. Please try again.'
@@ -265,53 +273,70 @@ const handleScan = async () => {
           </div>
 
           <!-- Scan tab -->
-          <div v-if="!isEdit && activeTab === 'scan'" class="px-6 py-6">
-            <!-- Dropzone -->
-            <div
-              v-if="!scanPreviewUrl"
-              class="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-gold hover:bg-cream/40 transition-colors"
-              @click="fileInputRef?.click()"
-              @dragover.prevent
-              @drop="onDrop"
-            >
-              <p class="text-4xl mb-3 select-none">📸</p>
-              <p class="font-sans font-semibold text-ink text-sm mb-1">Drop a photo here or click to browse</p>
-              <p class="font-sans text-muted text-xs">JPG, PNG, WEBP — photos of handwritten or printed recipes</p>
-              <input
-                ref="fileInputRef"
-                type="file"
-                accept="image/*"
-                class="hidden"
-                @change="onFileChange"
-              />
-            </div>
+          <div v-if="!isEdit && activeTab === 'scan'" class="px-6 py-6 space-y-4">
 
-            <!-- Preview -->
-            <div v-else class="space-y-4">
-              <div class="relative rounded-xl overflow-hidden border border-border">
-                <img :src="scanPreviewUrl" alt="Recipe photo" class="w-full max-h-72 object-contain bg-soft" />
+            <!-- Photo slots -->
+            <div class="grid grid-cols-2 gap-3">
+              <!-- Existing photos -->
+              <div
+                v-for="(url, idx) in scanPreviewUrls"
+                :key="idx"
+                class="relative rounded-xl overflow-hidden border border-border aspect-[4/3] bg-soft"
+              >
+                <img :src="url" :alt="`Photo ${idx + 1}`" class="w-full h-full object-contain" />
                 <button
                   type="button"
-                  @click="resetScan"
+                  @click="removePhoto(idx)"
                   class="absolute top-2 right-2 w-7 h-7 rounded-full bg-ink/70 text-white flex items-center justify-center text-base hover:bg-ink transition-colors"
                 >
                   ×
                 </button>
+                <span class="absolute bottom-2 left-2 text-xs font-sans font-semibold bg-ink/60 text-white rounded px-1.5 py-0.5">
+                  {{ idx === 0 ? 'Front' : 'Back' }}
+                </span>
               </div>
 
-              <p v-if="scanError" class="text-rust text-sm font-sans text-center">{{ scanError }}</p>
-
-              <button
-                type="button"
-                @click="handleScan"
-                :disabled="scanLoading"
-                class="btn-primary w-full justify-center"
+              <!-- Add photo slot (shown when < 2 photos) -->
+              <div
+                v-if="scanPreviewUrls.length < 2"
+                class="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center cursor-pointer hover:border-gold hover:bg-cream/40 transition-colors"
+                @click="fileInputRef?.click()"
+                @dragover.prevent
+                @drop="onDrop"
               >
-                <span v-if="scanLoading" class="inline-block w-4 h-4 border-2 border-parchment/40 border-t-parchment rounded-full animate-spin"></span>
-                <span v-else>✨</span>
-                {{ scanLoading ? 'Scanning recipe…' : 'Scan Recipe' }}
-              </button>
+                <p class="text-3xl mb-1 select-none">📸</p>
+                <p class="font-sans font-semibold text-ink text-xs text-center px-2">
+                  {{ scanPreviewUrls.length === 0 ? 'Add photo' : 'Add back side' }}
+                </p>
+                <p class="font-sans text-muted text-xs mt-0.5">or drag & drop</p>
+              </div>
             </div>
+
+            <!-- Empty state hint when no photos yet -->
+            <p v-if="scanPreviewUrls.length === 0" class="text-center text-muted text-xs font-sans">
+              Upload 1–2 photos (front & back of a recipe card)
+            </p>
+
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              @change="onFileChange"
+            />
+
+            <p v-if="scanError" class="text-rust text-sm font-sans text-center">{{ scanError }}</p>
+
+            <button
+              type="button"
+              @click="handleScan"
+              :disabled="scanLoading || scanPreviewUrls.length === 0"
+              class="btn-primary w-full justify-center"
+            >
+              <span v-if="scanLoading" class="inline-block w-4 h-4 border-2 border-parchment/40 border-t-parchment rounded-full animate-spin mr-1"></span>
+              <span v-else class="mr-1">✨</span>
+              {{ scanLoading ? 'Scanning recipe…' : 'Scan Recipe' }}
+            </button>
           </div>
 
           <!-- Form -->

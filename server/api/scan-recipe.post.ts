@@ -2,10 +2,10 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { imageBase64, mediaType } = body as { imageBase64: string; mediaType: string }
+  const { images } = body as { images: Array<{ imageBase64: string; mediaType: string }> }
 
-  if (!imageBase64 || !mediaType) {
-    throw createError({ statusCode: 400, statusMessage: 'imageBase64 and mediaType are required' })
+  if (!images?.length) {
+    throw createError({ statusCode: 400, statusMessage: 'At least one image is required' })
   }
 
   const config = useRuntimeConfig()
@@ -22,17 +22,17 @@ export default defineEventHandler(async (event) => {
       {
         role: 'user',
         content: [
-          {
-            type: 'image',
+          ...images.map(img => ({
+            type: 'image' as const,
             source: {
-              type: 'base64',
-              media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-              data: imageBase64,
+              type: 'base64' as const,
+              media_type: img.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+              data: img.imageBase64,
             },
-          },
+          })),
           {
             type: 'text',
-            text: `Please extract the recipe from this image and return it as a JSON object with exactly these fields:
+            text: `Please extract the recipe from ${images.length > 1 ? 'these images (front and back of a recipe card)' : 'this image'} and return it as a JSON object with exactly these fields:
 {
   "title": "Recipe name",
   "description": "Brief description (1-2 sentences, or empty string if none)",

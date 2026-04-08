@@ -1849,9 +1849,9 @@ const styles$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
 const scanRecipe_post = defineEventHandler(async (event) => {
   var _a, _b;
   const body = await readBody(event);
-  const { imageBase64, mediaType } = body;
-  if (!imageBase64 || !mediaType) {
-    throw createError({ statusCode: 400, statusMessage: "imageBase64 and mediaType are required" });
+  const { images } = body;
+  if (!(images == null ? void 0 : images.length)) {
+    throw createError({ statusCode: 400, statusMessage: "At least one image is required" });
   }
   const config = useRuntimeConfig();
   if (!config.anthropicApiKey) {
@@ -1865,17 +1865,17 @@ const scanRecipe_post = defineEventHandler(async (event) => {
       {
         role: "user",
         content: [
-          {
+          ...images.map((img) => ({
             type: "image",
             source: {
               type: "base64",
-              media_type: mediaType,
-              data: imageBase64
+              media_type: img.mediaType,
+              data: img.imageBase64
             }
-          },
+          })),
           {
             type: "text",
-            text: `Please extract the recipe from this image and return it as a JSON object with exactly these fields:
+            text: `Please extract the recipe from ${images.length > 1 ? "these images (front and back of a recipe card)" : "this image"} and return it as a JSON object with exactly these fields:
 {
   "title": "Recipe name",
   "description": "Brief description (1-2 sentences, or empty string if none)",
