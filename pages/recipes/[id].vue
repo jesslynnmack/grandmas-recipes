@@ -5,6 +5,7 @@ definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
 const { recipes, loadFromStorage, deleteRecipe } = useRecipes()
+const { show: showToast } = useToast()
 const isLoaded = ref(false)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
@@ -21,6 +22,7 @@ const recipe = computed(() =>
 const handleDelete = async () => {
   if (recipe.value) {
     deleteRecipe(recipe.value.id)
+    showToast('Recipe removed from the book', '🗑️')
     await navigateTo('/recipes')
   }
 }
@@ -38,12 +40,15 @@ const formatDate = (ts: number) => {
     <!-- Top nav -->
     <header class="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-border z-40">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-        <NuxtLink
-          to="/recipes"
-          class="flex items-center gap-2 text-muted hover:text-ink text-sm font-sans transition-colors"
-        >
-          ← Back to Recipes
-        </NuxtLink>
+        <div class="flex items-center gap-3">
+          <img :src="'/grandma.png'" alt="Grandma" class="w-9 h-9 rounded-full object-cover border-2 border-cream shadow-sm flex-shrink-0" />
+          <NuxtLink
+            to="/recipes"
+            class="flex items-center gap-1.5 text-muted hover:text-ink text-sm font-sans transition-colors"
+          >
+            ← Back to Recipes
+          </NuxtLink>
+        </div>
         <div v-if="recipe" class="flex items-center gap-2">
           <button @click="showEditModal = true" class="btn-secondary text-sm py-2 px-4">
             Edit
@@ -164,6 +169,21 @@ const formatDate = (ts: number) => {
           <span class="text-gold">📝</span> Notes
         </h2>
         <p class="font-sans text-brown text-sm leading-relaxed italic">{{ recipe.notes }}</p>
+      </div>
+
+      <!-- Original recipe photo -->
+      <div v-if="recipe.scanPhotoUrl" class="mt-8">
+        <h2 class="font-serif text-xl text-ink mb-4 flex items-center gap-2">
+          <span>📸</span> Original Recipe Card
+        </h2>
+        <div class="rounded-xl overflow-hidden border border-border shadow-sm inline-block max-w-full">
+          <img
+            :src="recipe.scanPhotoUrl"
+            alt="Original recipe card"
+            class="max-w-full max-h-[500px] object-contain block"
+          />
+        </div>
+        <p class="font-sans text-muted text-xs mt-2">The original recipe as scanned</p>
       </div>
 
     </div>

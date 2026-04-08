@@ -23,8 +23,22 @@ const activeTab = ref<'scan' | 'manual'>('manual')
 const scanFiles = ref<File[]>([])
 const scanPreviewUrls = ref<string[]>([])
 const scanLoading = ref(false)
+const scanLoadingMsgIdx = ref(0)
 const scanError = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const savedScanPhotoUrl = ref<string | null>(null)
+
+const SCAN_MESSAGES = [
+  { text: "Grandma's putting on her reading glasses...", emoji: "👓" },
+  { text: "Carefully reading each ingredient...", emoji: "✍️" },
+  { text: "Almost ready, sweetheart!", emoji: "🧡" },
+  { text: "Just a moment, dear...", emoji: "💛" },
+  { text: "Copying it down just right...", emoji: "📝" },
+]
+
+let scanMsgInterval: ReturnType<typeof setInterval> | null = null
+
+const { show: showToast } = useToast()
 
 const title = ref('')
 const description = ref('')
@@ -55,12 +69,32 @@ const resetScan = () => {
   scanPreviewUrls.value = []
   scanLoading.value = false
   scanError.value = ''
+  savedScanPhotoUrl.value = null
+  if (scanMsgInterval) { clearInterval(scanMsgInterval); scanMsgInterval = null }
 }
 
 const removePhoto = (idx: number) => {
   scanFiles.value.splice(idx, 1)
   scanPreviewUrls.value.splice(idx, 1)
 }
+
+// Compress an image file to a JPEG data URL (max 800px wide, 72% quality)
+const compressImage = (file: File): Promise<string> =>
+  new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const maxW = 800
+      const ratio = Math.min(1, maxW / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * ratio)
+      canvas.height = Math.round(img.height * ratio)
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    img.src = url
+  })
 
 watch(() => props.recipe, (recipe) => {
   if (recipe) {
@@ -135,12 +169,14 @@ const handleSubmit = () => {
 
   if (isEdit.value && props.recipe) {
     updateRecipe(props.recipe.id, data)
+    showToast('Recipe updated!', '✏️')
   } else {
-    addRecipe(data)
+    addRecipe({ ...data, scanPhotoUrl: savedScanPhotoUrl.value ?? undefined })
+    showToast("Recipe saved! Grandma would be so proud", '💕')
   }
 
   emit('saved')
-  if (!isEdit.value) resetForm()
+  if (!isEdit.value) { resetForm(); resetScan() }
 }
 
 const handleClose = () => {
@@ -190,9 +226,18 @@ const toBase64 = (file: File): Promise<string> =>
 const handleScan = async () => {
   if (!scanFiles.value.length) return
   scanLoading.value = true
+  scanLoadingMsgIdx.value = 0
   scanError.value = ''
 
+  // Cycle through fun loading messages
+  scanMsgInterval = setInterval(() => {
+    scanLoadingMsgIdx.value = (scanLoadingMsgIdx.value + 1) % SCAN_MESSAGES.length
+  }, 1800)
+
   try {
+    // Compress first photo and store for recipe
+    savedScanPhotoUrl.value = await compressImage(scanFiles.value[0])
+
     const images = await Promise.all(
       scanFiles.value.map(async (file) => ({
         imageBase64: await toBase64(file),
@@ -215,10 +260,13 @@ const handleScan = async () => {
     notes.value = result.notes || ''
     errors.value = {}
 
+    showToast("Grandma found the recipe!", "✨")
     activeTab.value = 'manual'
   } catch (err: any) {
     scanError.value = err?.data?.statusMessage || 'Something went wrong. Please try again.'
+    savedScanPhotoUrl.value = null
   } finally {
+    if (scanMsgInterval) { clearInterval(scanMsgInterval); scanMsgInterval = null }
     scanLoading.value = false
   }
 }
@@ -275,6 +323,25 @@ const handleScan = async () => {
           <!-- Scan tab -->
           <div v-if="!isEdit && activeTab === 'scan'" class="px-6 py-6 space-y-4">
 
+            <!-- Fun loading overlay -->
+            <div v-if="scanLoading" class="flex flex-col items-center justify-center py-10 gap-5">
+              <div class="relative">
+                <img :src="'/grandma.png'" alt="Grandma" class="w-24 h-24 rounded-full object-cover border-4 border-cream shadow-lg animate-bounce-slow" />
+                <span class="absolute -bottom-1 -right-1 text-2xl animate-spin-slow">✨</span>
+              </div>
+              <Transition name="fade-msg" mode="out-in">
+                <p :key="scanLoadingMsgIdx" class="font-serif text-lg text-ink text-center leading-snug">
+                  {{ SCAN_MESSAGES[scanLoadingMsgIdx].emoji }} {{ SCAN_MESSAGES[scanLoadingMsgIdx].text }}
+                </p>
+              </Transition>
+              <div class="flex gap-1.5">
+                <span v-for="i in 4" :key="i" class="w-2 h-2 rounded-full bg-rust animate-pulse" :style="`animation-delay: ${(i-1)*0.2}s`"></span>
+              </div>
+            </div>
+
+            <!-- Upload UI (shown when not loading) -->
+            <div v-else class="space-y-4">
+
             <!-- Photo slots -->
             <div class="grid grid-cols-2 gap-3">
               <!-- Existing photos -->
@@ -330,17 +397,27 @@ const handleScan = async () => {
             <button
               type="button"
               @click="handleScan"
-              :disabled="scanLoading || scanPreviewUrls.length === 0"
+              :disabled="scanPreviewUrls.length === 0"
               class="btn-primary w-full justify-center"
             >
-              <span v-if="scanLoading" class="inline-block w-4 h-4 border-2 border-parchment/40 border-t-parchment rounded-full animate-spin mr-1"></span>
-              <span v-else class="mr-1">✨</span>
-              {{ scanLoading ? 'Scanning recipe…' : 'Scan Recipe' }}
+              <span class="mr-1">✨</span> Scan Recipe
             </button>
+
+            </div><!-- end v-else (not loading) -->
           </div>
 
           <!-- Form -->
           <form v-if="isEdit || activeTab === 'manual'" @submit.prevent="handleSubmit" class="px-6 py-6 space-y-7">
+
+            <!-- Scanned photo preview banner -->
+            <div v-if="savedScanPhotoUrl" class="flex items-center gap-3 bg-cream border border-border rounded-xl p-3">
+              <img :src="savedScanPhotoUrl" alt="Original recipe" class="w-16 h-16 object-cover rounded-lg flex-shrink-0 border border-border" />
+              <div>
+                <p class="font-sans font-semibold text-ink text-xs">📸 Original recipe photo saved</p>
+                <p class="font-sans text-muted text-xs mt-0.5">It will be displayed alongside the recipe</p>
+              </div>
+              <button type="button" @click="savedScanPhotoUrl = null" class="ml-auto text-muted hover:text-rust text-lg leading-none flex-shrink-0">×</button>
+            </div>
 
             <!-- Basic Info -->
             <div class="space-y-4">

@@ -22,6 +22,40 @@ body {
   color: var(--color-ink);
 }
 
+/* Grandma loading animation keyframes */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 1.4s ease-in-out infinite;
+}
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Toast message fade transition */
+.fade-msg-enter-active {
+  transition: all 0.35s ease;
+}
+.fade-msg-leave-active {
+  transition: all 0.2s ease;
+  position: absolute;
+}
+.fade-msg-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.fade-msg-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 @layer components {
   .btn-primary {
     @apply bg-rust text-parchment font-sans font-semibold px-5 py-2.5 rounded-lg hover:bg-brown transition-colors duration-200 cursor-pointer inline-flex items-center gap-2;

@@ -77,11 +77,14 @@ const openAddModal = () => {
     <!-- Sticky header -->
     <header class="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-border z-40">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-        <div class="min-w-0">
-          <h1 class="font-serif text-2xl sm:text-3xl text-ink leading-tight">Grandma's Recipe Book</h1>
-          <p class="text-muted text-xs font-sans mt-0.5 hidden sm:block">
-            {{ recipes.length }} {{ recipes.length === 1 ? 'recipe' : 'recipes' }} in the collection
-          </p>
+        <div class="flex items-center gap-3 min-w-0">
+          <img :src="'/grandma.png'" alt="Grandma" class="w-11 h-11 rounded-full object-cover border-2 border-cream shadow-sm flex-shrink-0" />
+          <div class="min-w-0">
+            <h1 class="font-serif text-2xl sm:text-3xl text-ink leading-tight">Grandma's Recipe Book</h1>
+            <p class="text-muted text-xs font-sans mt-0.5 hidden sm:block">
+              {{ recipes.length }} {{ recipes.length === 1 ? 'recipe' : 'recipes' }} in the collection
+            </p>
+          </div>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
           <button @click="openAddModal" class="btn-primary text-sm">

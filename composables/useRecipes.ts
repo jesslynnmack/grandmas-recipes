@@ -10,6 +10,7 @@ export interface Recipe {
   cookTime: string
   notes: string
   createdAt: number
+  scanPhotoUrl?: string
 }
 
 const STORAGE_KEY = 'grandmas-recipes-data'
